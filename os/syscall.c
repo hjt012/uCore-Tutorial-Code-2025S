@@ -5,6 +5,8 @@
 #include "timer.h"
 #include "trap.h"
 
+#define SYS_getpid 172
+
 uint64 sys_write(int fd, char *str, uint len)
 {
 	debugf("sys_write fd = %d str = %x, len = %d", fd, str, len);
@@ -39,6 +41,26 @@ uint64 sys_gettimeofday(TimeVal *val, int _tz)
 /*
 * LAB1: you may need to define sys_trace here
 */
+uint64 sys_trace(int trace_request, unsigned long id, uint8 data)
+{
+	struct proc *p = curr_proc();
+
+	switch (trace_request) {
+	case 0: // 读取一个字节
+		return (uint64)(*(uint8 *)id);
+	case 1: // 写入一个字节
+		*(uint8 *)id = data;
+		return 0;
+	case 2: // 查询系统调用次数
+		if (id >= 512) {
+			return 0;
+		}
+		return p->syscall_counts[id];
+	default:
+		return -1;
+	}
+}
+
 
 extern char trap_page[];
 
@@ -53,6 +75,14 @@ void syscall()
 	/*
 	* LAB1: you may need to update syscall counter here
 	*/
+	struct proc *p = curr_proc();
+
+	if (id >= 0 && id < 512) {
+		p->syscall_counts[id]++;
+	}
+
+	
+
 	switch (id) {
 	case SYS_write:
 		ret = sys_write(args[0], (char *)args[1], args[2]);
@@ -69,9 +99,15 @@ void syscall()
 	/*
 	* LAB1: you may need to add SYS_trace case here
 	*/
+	case SYS_trace:
+		ret = sys_trace(args[0], args[1], (uint8)args[2]);
+		break;
+	case SYS_getpid:
+		ret = curr_proc()->pid;
+		break;
 	default:
 		ret = -1;
-		errorf("unknown syscall %d", id);
+		errorf("unknown syscall %d\n", id);
 	}
 	trapframe->a0 = ret;
 	tracef("syscall ret %d", ret);

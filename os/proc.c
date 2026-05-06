@@ -34,6 +34,12 @@ void proc_init(void)
 		/*
 		* LAB1: you may need to initialize your new fields of proc here
 		*/
+		for (int i = 0; i < 512; i++) {
+			p->syscall_counts[i] = 0;
+		}
+	}
+	for (int i = 0; i < 512; i++) {
+		idle.syscall_counts[i] = 0;
 	}
 	idle.kstack = (uint64)boot_stack_top;
 	idle.pid = 0;
@@ -65,6 +71,11 @@ found:
 	memset(&p->context, 0, sizeof(p->context));
 	memset(p->trapframe, 0, PAGE_SIZE);
 	memset((void *)p->kstack, 0, PAGE_SIZE);
+
+	for (int i = 0; i < 512; i++) {
+		p->syscall_counts[i] = 0;
+	}
+
 	p->context.ra = (uint64)usertrapret;
 	p->context.sp = p->kstack + PAGE_SIZE;
 	return p;
@@ -84,6 +95,8 @@ void scheduler(void)
 				p->state = RUNNING;
 				current_proc = p;
 				swtch(&idle.context, &p->context);
+
+				current_proc = &idle;
 			}
 		}
 	}
