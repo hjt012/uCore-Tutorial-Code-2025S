@@ -43,6 +43,7 @@ struct proc {
 	/*
 	* LAB1: you may need to add some new fields here
 	*/
+	uint64 syscall_counts[512];
 };
 
 struct proc *curr_proc();
