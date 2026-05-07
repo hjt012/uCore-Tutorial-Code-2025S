@@ -86,6 +86,12 @@ found:
 	p->pagetable = uvmcreate((uint64)p->trapframe);
 	p->program_brk = 0;
         p->heap_bottom = 0;
+
+		p->stride = 0;
+		p->pass = 0;
+		p->priority = 16;  // 默认优先级
+		p->pass = 65536 / p->priority;
+
 	memset(&p->context, 0, sizeof(p->context));
 	memset((void *)p->kstack, 0, KSTACK_SIZE);
 	memset((void *)p->trapframe, 0, TRAP_PAGE_SIZE);
@@ -102,27 +108,35 @@ found:
 void scheduler()
 {
 	struct proc *p;
+	struct proc *min_proc;
+	uint64 min_stride;
+
 	for (;;) {
-		/*int has_proc = 0;
+		// stride 调度：从 RUNNABLE 中选 stride 最小的
+		min_proc = NULL;
+		min_stride = ~0ULL; // max value
+
 		for (p = pool; p < &pool[NPROC]; p++) {
 			if (p->state == RUNNABLE) {
-				has_proc = 1;
-				tracef("swtich to proc %d", p - pool);
-				p->state = RUNNING;
-				current_proc = p;
-				swtch(&idle.context, &p->context);
+				if (min_proc == NULL || p->stride < min_stride) {
+					min_proc = p;
+					min_stride = p->stride;
+				}
 			}
 		}
-		if(has_proc == 0) {
-			panic("all app are over!\n");
-		}*/
-		p = fetch_task();
-		if (p == NULL) {
+
+		if (min_proc == NULL) {
 			panic("all app are over!\n");
 		}
-		tracef("swtich to proc %d", p - pool);
+
+		// 找到了，调度它
+		p = min_proc;
 		p->state = RUNNING;
 		current_proc = p;
+
+		// 更新 stride
+		p->stride += p->pass;
+
 		swtch(&idle.context, &p->context);
 	}
 }
@@ -146,7 +160,6 @@ void sched()
 void yield()
 {
 	current_proc->state = RUNNABLE;
-	add_task(current_proc);
 	sched();
 }
 
@@ -186,7 +199,7 @@ int fork()
 	np->trapframe->a0 = 0;
 	np->parent = p;
 	np->state = RUNNABLE;
-	add_task(np);
+	//add_task(np);
 	return np->pid;
 }
 
@@ -228,7 +241,7 @@ int wait(int pid, int *code)
 			return -1;
 		}
 		p->state = RUNNABLE;
-		add_task(p);
+		//add_task(p);
 		sched();
 	}
 }
@@ -256,6 +269,9 @@ void exit(int code)
 
 // Grow or shrink user memory by n bytes.
 // Return 0 on succness, -1 on failure.
+
+int spawn(char *name);
+
 int growproc(int n)
 {
         uint64 program_brk;
@@ -274,4 +290,30 @@ int growproc(int n)
         }
         p->program_brk = program_brk;
         return 0;
+}
+
+int spawn(char *name)
+{
+	int id = get_id_by_name(name);
+	if (id < 0)
+		return -1;
+
+	struct proc *p = curr_proc();
+	struct proc *np = allocproc();
+	if (np == 0)
+		return -1;
+
+	// 设置父子关系
+	np->parent = p;
+
+	// 加载程序
+	loader(id, np);
+
+	// 设置子进程的 trapframe（fork 中 a0=0 表示子进程）
+	np->trapframe->a0 = 0;
+
+	// 加入就绪队列
+	//add_task(np);
+
+	return np->pid;
 }

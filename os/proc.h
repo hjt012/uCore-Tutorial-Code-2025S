@@ -47,6 +47,9 @@ struct proc {
 	struct file *files[FD_BUFFER_SIZE];
 	uint64 program_brk;
 	uint64 heap_bottom;
+	uint64 stride;      // stride 调度算法的当前 stride
+	uint64 pass;        // stride 调度算法的步长
+	int priority;       // 进程优先级 (>=2)
 };
 
 int cpuid();
@@ -57,6 +60,7 @@ void scheduler() __attribute__((noreturn));
 void sched();
 void yield();
 int fork();
+int spawn(char *);
 int exec(char *);
 int wait(int, int *);
 void add_task(struct proc *);

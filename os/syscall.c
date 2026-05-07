@@ -94,13 +94,21 @@ uint64 sys_wait(int pid, uint64 va)
 
 uint64 sys_spawn(uint64 va)
 {
-	// TODO: your job is to complete the sys call
-	return -1;
+	struct proc *p = curr_proc();
+	char name[200];
+	if (copyinstr(p->pagetable, name, va, 200) < 0)
+		return -1;
+	return spawn(name);
 }
 
-uint64 sys_set_priority(long long prio){
-    // TODO: your job is to complete the sys call
-    return -1;
+uint64 sys_set_priority(long long prio)
+{
+	if (prio < 2)
+		return -1;
+	struct proc *p = curr_proc();
+	p->priority = prio;
+	p->pass = 65536 / prio;  // BIG_STRIDE = 65536
+	return prio;
 }
 
 
@@ -161,6 +169,9 @@ void syscall()
 	case SYS_sbrk:
                 ret = sys_sbrk(args[0]);
                 break;
+	case SYS_setpriority:
+		ret = sys_set_priority((long long)args[0]);
+		break;
 	default:
 		ret = -1;
 		errorf("unknown syscall %d", id);
